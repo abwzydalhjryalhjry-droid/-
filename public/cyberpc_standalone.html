@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberPC 3D - تشريح وتجميع الكمبيوتر وتدفق البيانات والإنترنت (Single-File)</title>
+  
+  <!-- مكتبة GSAP للرسوم المتحركة الانسيابية عبر CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <!-- استيراد مكتبة Three.js وأدواتها عبر Import Map بدون أي أداة بناء (No Bundler) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    /* -------------------------------------------------------------
+       التصميم البصري والسايبربانك والتشريح الإنساني
+       ------------------------------------------------------------- */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: #06080d;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", "Tajawal", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #webgl-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* الشريط العلوي */
+    .top-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(6, 8, 13, 0.88);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #00f0ff, #9d00ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 13px;
+      color: #000;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: #ffffff;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: #00f0ff;
+      margin-right: 8px;
+    }
+
+    .btn {
+      background: #111622;
+      border: 1px solid #1e293b;
+      color: #cbd5e1;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #1a2233;
+      border-color: rgba(0, 240, 255, 0.5);
+      color: #fff;
+    }
+
+    .btn.active {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: #00f0ff;
+      color: #00f0ff;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+    }
+
+    .btn.cinema-active {
+      background: linear-gradient(135deg, #9d00ff, #00f0ff);
+      color: #fff;
+      font-weight: bold;
+      border-color: #fff;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+    }
+
+    .btn.power-on {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+
+    /* أرقام القطع الطافية في الفضاء */
+    #markers-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      overflow: hidden;
+    }
+
+    .number-marker {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(8, 11, 18, 0.9);
+      border: 1.5px solid #00f0ff;
+      color: #00f0ff;
+      font-family: monospace;
+      font-weight: bold;
+      font-size: 12px;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .number-marker:hover {
+      transform: translate(-50%, -50%) scale(1.2);
+      background: #00f0ff;
+      color: #06080d;
+      z-index: 30;
+    }
+
+    .number-marker.current-step {
+      background: #9d00ff;
+      border-color: #fff;
+      color: #fff;
+      animation: pulseMarker 1.5s infinite;
+    }
+
+    @keyframes pulseMarker {
+      0%, 100% { box-shadow: 0 0 10px rgba(157, 0, 255, 0.6); }
+      50% { box-shadow: 0 0 20px rgba(0, 240, 255, 1); }
+    }
+
+    /* لوحة دليل التركيب الجانبية */
+    .assembly-panel {
+      position: absolute;
+      top: 70px;
+      left: 20px;
+      width: 360px;
+      max-height: calc(100vh - 100px);
+      background: rgba(8, 11, 18, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      color: #e2e8f0;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+      z-index: 25;
+      display: none;
+      flex-direction: column;
+    }
+
+    .assembly-panel.visible {
+      display: flex;
+      animation: slideLeft 0.3s ease-out;
+    }
+
+    @keyframes slideLeft {
+      from { opacity: 0; transform: translateX(-15px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .step-card {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+
+    .step-list {
+      flex: 1;
+      overflow-y: auto;
+      margin: 10px 0;
+      padding-right: 4px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .step-item.active {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: #00f0ff;
+      color: #fff;
+    }
+
+    /* لوحة التحكم السفلية الموحدة */
+    .bottom-dock {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100vw - 32px);
+      max-width: 920px;
+      background: rgba(8, 11, 18, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 14px;
+      padding: 14px 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 240, 255, 0.15);
+      z-index: 20;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .bottom-dock.collapsed {
+      transform: translate(-50%, calc(100% - 36px));
+    }
+
+    .collapse-btn {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(8, 11, 18, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      color: #94a3b8;
+      font-size: 11px;
+      padding: 4px 14px;
+      cursor: pointer;
+    }
+
+    .dock-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .dock-row + .dock-row {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .slider-group input[type="range"] {
+      flex: 1;
+      accent-color: #00f0ff;
+      height: 5px;
+      border-radius: 4px;
+      background: #1e293b;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* بطاقة تفاصيل القطعة والمقارنة الإنسانية */
+    .spec-card {
+      position: absolute;
+      top: 70px;
+      right: 20px;
+      width: 350px;
+      max-height: calc(100vh - 180px);
+      background: rgba(8, 11, 18, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      color: #e2e8f0;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+      z-index: 25;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .spec-card.visible {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .human-analogy-box {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(157, 0, 255, 0.15));
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+
+    .human-analogy-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: #00f0ff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .human-analogy-text {
+      font-size: 12px;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+
+    /* الوضع السينمائي الشامل */
+    .cinema-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      pointer-events: none;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cinema-overlay.visible {
+      display: flex;
+    }
+
+    .cinema-bar-top {
+      height: 70px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.95), transparent);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: auto;
+    }
+
+    .cinema-bar-bot {
+      height: 80px;
+      background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: auto;
+    }
+
+    .cinema-center-card {
+      align-self: center;
+      max-width: 650px;
+      margin: 0 20px;
+      background: rgba(8, 11, 18, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.8);
+      pointer-events: auto;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 640px) {
+      .spec-card, .assembly-panel {
+        width: calc(100vw - 32px);
+        right: 16px;
+        left: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- حاوية المشهد ثلاثي الأبعاد -->
+  <div id="webgl-container"></div>
+
+  <!-- حاوية أرقام القطع التسلسلية (1 إلى 9) الملتصقة بالقطع -->
+  <div id="markers-container"></div>
+
+  <!-- الشريط العلوي -->
+  <header class="top-header" id="main-header">
+    <div class="brand">
+      <div class="brand-badge">3D</div>
+      <div class="brand-title">CYBER-PC 3D</div>
+      <span class="brand-subtitle">الحياة الرقمية وتدفق البيانات</span>
+    </div>
+
+    <!-- شريط اختيار نوع الجهاز (Device Selector) -->
+    <div style="display: flex; gap: 4px; background: rgba(15, 23, 42, 0.95); padding: 4px; border-radius: 10px; border: 1px solid rgba(0, 240, 255, 0.3);">
+      <button class="btn device-btn active" id="dev-desktop-btn" data-device="desktop" style="padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px;">🖥️ كمبيوتر مكتبي (Desktop)</button>
+      <button class="btn device-btn" id="dev-laptop-btn" data-device="laptop" style="padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px;">💻 لابتوب (Laptop)</button>
+      <button class="btn device-btn" id="dev-minipc-btn" data-device="minipc" style="padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px;">🔲 ميني بي سي (Mini-PC)</button>
+    </div>
+
+    <div style="display: flex; gap: 8px;">
+      <button class="btn" id="turbo-toggle-btn" style="border-color: #10b981; color: #10b981;" title="تبديل بين وضع الأداء الفائق 60 FPS ووضع الدقة العالية">⚡ وضع 60 FPS</button>
+      <button class="btn" id="cinema-toggle-btn">🎬 الوضع السينمائي (Cinema)</button>
+      <button class="btn active" id="dataflow-toggle-btn">⚡ تدفق البيانات (Data)</button>
+      <button class="btn" id="guide-toggle-btn">🔧 دليل التركيب (Guide)</button>
+      <button class="btn active" id="numbers-toggle-btn"># أرقام القطع</button>
+      <button class="btn power-on" id="power-toggle-btn">⚡ النظام يعمل</button>
+    </div>
+  </header>
+
+  <!-- غطاء الوضع السينمائي (Cinematic Director Overlay) -->
+  <div class="cinema-overlay" id="cinema-overlay">
+    <div class="cinema-bar-top">
+      <div style="font-size: 13px; font-weight: bold; color: #00f0ff; font-family: monospace;">
+        🎬 CINEMATIC DIRECTOR MODE · الجولة السينمائية الفلسفية للأعضاء الحيوية
+      </div>
+      <button class="btn" id="exit-cinema-btn">الخروج من السينما ✕</button>
+    </div>
+
+    <div class="cinema-center-card" id="cinema-center-card">
+      <div style="font-size: 12px; color: #00f0ff; font-family: monospace; margin-bottom: 6px;" id="cinema-analogy-badge">🧠 الدماغ والعقل المفكر</div>
+      <h2 style="font-size: 22px; color: #fff; font-weight: bold; margin-bottom: 8px;" id="cinema-title">المعالج المركزي (CPU)</h2>
+      <p style="font-size: 15px; color: #e2e8f0; line-height: 1.6; margin-bottom: 6px;" id="cinema-quote">« يفكر ويحسب كل شيء ويصدر مليارات الأوامر في كل ثانية. »</p>
+    </div>
+
+    <div class="cinema-bar-bot">
+      <div style="font-size: 12px; color: #94a3b8;">تنتقل الكاميرا تلقائياً بين الأعضاء الحيوية كل 6 ثوانٍ</div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn" id="cinema-prev-btn">◀ العضو السابق</button>
+        <button class="btn" id="cinema-next-btn">العضو التالي ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- لوحة دليل التركيب الجانبية -->
+  <div class="assembly-panel" id="assembly-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+      <h3 style="font-size: 14px; font-weight: bold; color: #00f0ff;">دليل التركيب خطوة بخطوة</h3>
+      <button class="btn" id="close-guide-btn" style="padding: 2px 8px;">✕</button>
+    </div>
+    
+    <div class="step-card" id="guide-step-card">
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #00f0ff; font-family: monospace; margin-bottom: 4px;">
+        <span id="guide-step-num">الخطوة 1 من 8</span>
+        <span id="guide-step-status" style="color: #34d399;">تم التثبيت ✓</span>
+      </div>
+      <h4 id="guide-part-title" style="font-size: 13px; color: #fff; margin-bottom: 4px;">الهيكل واللوح الزجاجي</h4>
+      <p id="guide-instruction" style="font-size: 11px; color: #94a3b8; line-height: 1.5;">قم بتثبيت مسامير المباعدة وإعداد الحجرة لاستقبال اللوحة الأم.</p>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button class="btn" id="assemble-step-btn" style="flex: 1; background: #00f0ff; color: #000; font-weight: bold;">تركيب القطعة</button>
+        <button class="btn" id="disassemble-step-btn" style="flex: 1;">فك القطعة</button>
+      </div>
+    </div>
+
+    <div class="step-list" id="guide-step-list"></div>
+
+    <div style="display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+      <button class="btn" id="assemble-all-btn" style="flex: 1; background: rgba(0,240,255,0.2); color: #00f0ff;">تجميع الكل</button>
+      <button class="btn" id="disassemble-all-btn" style="flex: 1;">تفكيك الكل</button>
+    </div>
+  </div>
+
+  <!-- بطاقة مواصفات القطعة والمقارنة الإنسانية -->
+  <div class="spec-card" id="spec-card">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <div style="font-size: 11px; color: #00f0ff; font-family: monospace;" id="spec-category">الفئة</div>
+        <h3 id="spec-title" style="font-size: 15px; color: #fff; margin-top: 2px;">اسم القطعة</h3>
+      </div>
+      <button class="btn" id="close-spec-btn" style="padding: 2px 8px;">✕</button>
+    </div>
+
+    <!-- صندوق المقارنة الإنسانية (Human Analogy Box) -->
+    <div class="human-analogy-box">
+      <div class="human-analogy-title" id="spec-human-title">🧠 الدماغ والعقل المفكر</div>
+      <p class="human-analogy-text" id="spec-human-desc">يفكر ويحسب كل شيء ويصدر مليارات الأوامر في كل ثانية.</p>
+    </div>
+
+    <p id="spec-desc" style="font-size: 11px; color: #94a3b8; line-height: 1.5; margin: 8px 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;"></p>
+    <table id="spec-table" style="width: 100%; font-size: 11px; margin-bottom: 12px;"></table>
+    <button class="btn" id="focus-part-btn" style="width: 100%; justify-content: center; background: rgba(0,240,255,0.15); color: #00f0ff;">تقريب الكاميرا 🔍</button>
+  </div>
+
+  <!-- لوحة التحكم السفلية الموحدة -->
+  <div class="bottom-dock" id="bottom-dock">
+    <button class="collapse-btn" id="collapse-toggle-btn">
+      <span id="collapse-icon">▾</span>
+      <span id="collapse-text">إخفاء لوحة التحكم</span>
+    </button>
+
+    <!-- الصف الأول: شريط التفكيك وزر التفكيك التلقائي -->
+    <div class="dock-row">
+      <div class="slider-group">
+        <label style="font-size: 12px; color: #94a3b8;">التفكيك والتركيب:</label>
+        <input type="range" id="explode-slider" min="0" max="1" step="0.01" value="0">
+        <span class="slider-value" id="explode-val">0%</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn" id="auto-explode-btn">نابض تلقائي</button>
+        <button class="btn" id="xray-btn">أشعة X-Ray 👁</button>
+        <button class="btn" id="globe-focus-btn">🌐 فحص الكرة الأرضية</button>
+      </div>
+    </div>
+
+    <!-- الصف الثاني: دلالات تدفق البيانات والمراوح -->
+    <div class="dock-row">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 11px;">
+        <span style="color: #94a3b8;">دلالات النبضات:</span>
+        <span style="color: #00f0ff;">● أوامر المعالج</span>
+        <span style="color: #10b981;">● بيانات الذاكرة</span>
+        <span style="color: #ff8800;">● تيار الطاقة</span>
+        <span style="color: #d946ef;">● حزم الإنترنت</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px; overflow-x: auto;">
+        <span style="font-size: 11px; color: #94a3b8;">الكاميرا:</span>
+        <button class="btn" data-cam="iso">بطولي</button>
+        <button class="btn" data-cam="front">المقدمة</button>
+        <button class="btn" data-cam="side">الجانب</button>
+        <button class="btn" data-cam="cpu">المعالج</button>
+        <button class="btn" data-cam="gpu">الكرت</button>
+        <button class="btn" data-cam="globe">الإنترنت</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- الكود البرمجي الرئيسي -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    // -------------------------------------------------------------
+    // تسلسل الأعضاء مع المقارنات الإنسانية العميقة
+    // -------------------------------------------------------------
+    const HARDWARE_ITEMS = [
+      {
+        id: 'case',
+        order: 1,
+        nameAr: 'الهيكل واللوح الزجاجي (Case)',
+        humanTitle: '🛡️ الهيكل العظمي والجلد',
+        humanDesc: 'يحمي الأعضاء الداخلية من الصدمات والغبار، وينظم التنفس والحرارة عبر مسارات مدروسة.',
+        specs: [['المواد', 'Steel & 4mm Glass'], ['مراوح السحب', '2 × 140mm ARGB'], ['الأبعاد', '480 × 225 × 495 mm']],
+        offset: [18.0, 0, 0]
+      },
+      {
+        id: 'psu',
+        order: 2,
+        nameAr: 'مزود الطاقة (PSU)',
+        humanTitle: '❤️ القلب النابض',
+        humanDesc: 'يضخ تيار الطاقة (الدم الكهربائي) عبر الشرايين (الكابلات) إلى كل عضو بدقة متناهية وبدون انقطاع.',
+        specs: [['القدرة', '1000W Platinum'], ['الكفاءة', '92%+'], ['النظام', 'Full Modular']],
+        offset: [0, 0, -12.0]
+      },
+      {
+        id: 'motherboard',
+        order: 3,
+        nameAr: 'اللوحة الأم (Motherboard)',
+        humanTitle: '🧬 الجهاز العصبي والعمود الفقري',
+        humanDesc: 'يربط جميع الأعضاء ببعضها، وينقل الإشارات الكهربائية ونبضات البيانات بين الدماغ والحواس.',
+        specs: [['المعيار', 'ATX (305 × 244 mm)'], ['المسارات', 'PCIe 5.0 (128 GB/s)'], ['الطبقات', '8-Layer Copper']],
+        offset: [0, 0, 0]
+      },
+      {
+        id: 'cpu',
+        order: 4,
+        nameAr: 'المعالج المركزي (CPU)',
+        humanTitle: '🧠 الدماغ والعقل المفكر',
+        humanDesc: 'يفكر، يحسب، يقرر، ويصدر مليارات الأوامر في كل ثانية لتنسيق حركة كل المكونات.',
+        specs: [['الأنوية', '16C / 32T'], ['التردد', '5.70 GHz'], ['الكاش', '64 MB 3D V-Cache']],
+        offset: [4.5, 0, 0]
+      },
+      {
+        id: 'cooler',
+        order: 5,
+        nameAr: 'المشتت الحراري والمروحة (Cooler)',
+        humanTitle: '🫁 الرئتان ومنظومة التنفس',
+        humanDesc: 'يمتص حرارة الدماغ العالية أثناء التفكير الشاق، ويطرد السخونة ليبقى العقل بارداً ومركزاً.',
+        specs: [['الأنابيب', '6 × 6mm Sintered Copper'], ['الزعانف', '42 Matrix Fins'], ['التبريد', '250W TDP']],
+        offset: [12.5, 0, 0]
+      },
+      {
+        id: 'ram',
+        order: 6,
+        nameAr: 'الذاكرة العشوائية (RAM)',
+        humanTitle: '⚡ الذاكرة قصيرة المدى والوعي',
+        humanDesc: 'تحتفظ بما تركز عليه وتفعله في هذه اللحظة بالذات، وتفرغ محتواها بمجرد النوم (إطفاء الجهاز).',
+        specs: [['السعة', '64 GB (2 × 32 GB)'], ['السرعة', 'DDR5-6400 MT/s'], ['التوقيت', 'CL32-38-38']],
+        offset: [0, 8.0, 0]
+      },
+      {
+        id: 'ssd',
+        order: 7,
+        nameAr: 'وحدة التخزين (M.2 NVMe SSD)',
+        humanTitle: '💾 الذاكرة طويلة المدى والذكريات',
+        humanDesc: 'دفتر ذكرياتك الدائم؛ يحفظ صورك، برامجك، وسنوات حياتك ويبقى صامداً حتى عند انقطاع الكهرباء.',
+        specs: [['السعة', '4,000 GB (4 TB)'], ['القراءة', '12,400 MB/s'], ['الواجهة', 'PCIe Gen5 x4']],
+        offset: [2.5, -2.5, 3.5]
+      },
+      {
+        id: 'gpu',
+        order: 8,
+        nameAr: 'كرت الشاشة (GPU)',
+        humanTitle: '👁️ العين والخيال الإبداعي',
+        humanDesc: 'يرسم الصور، ينسج العوالم ثلاثية الأبعاد، ويحول الأرقام الحسابية المجردة إلى مشاعر وألوان تراها.',
+        specs: [['ذاكرة الفيديو', '24 GB GDDR6X'], ['الأنوية', '16,384 Cores'], ['كابل الطاقة', '16-Pin 12VHPWR']],
+        offset: [0, -4.5, 9.5]
+      },
+      {
+        id: 'internet',
+        order: 9,
+        nameAr: 'الإنترنت والكرة الأرضية (Internet)',
+        humanTitle: '🌐 الحواس والاتصال بالعالم',
+        humanDesc: 'نافذة الكائن على الكون؛ يربطه بمليارات العقول الأخرى عبر المحيطات والأقمار الصناعية.',
+        specs: [['السرعة', '10,000 Mbps Fiber'], ['زمن الاستجابة', '1 ms Ping'], ['البروتوكول', 'IPv6 Cloud Link']],
+        offset: [0, 0, 0]
+      }
+    ];
+
+    // -------------------------------------------------------------
+    // إعداد المشهد ثلاثي الأبعاد
+    // -------------------------------------------------------------
+    const container = document.getElementById('webgl-container');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x06080d);
+    scene.fog = new THREE.FogExp2(0x06080d, 0.007);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 300);
+    camera.position.set(28, 22, 32);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 6;
+    controls.maxDistance = 120;
+    controls.maxPolarAngle = Math.PI / 2 + 0.15;
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+
+    // إضاءة استوديو متقدمة ومحسنة للأداء
+    const keyLight = new THREE.DirectionalLight(0xfff5ea, 2.4);
+    keyLight.position.set(35, 45, 30);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x7928ca, 0x05070a, 1.2);
+    scene.add(hemiLight);
+
+    const cyanRim = new THREE.DirectionalLight(0x00f0ff, 2.8);
+    cyanRim.position.set(-35, 20, -35);
+    scene.add(cyanRim);
+
+    const violetPoint = new THREE.PointLight(0x9d00ff, 3.5, 45);
+    violetPoint.position.set(12, -4, 18);
+    scene.add(violetPoint);
+
+    // شبكة الأرضية
+    const gridHelper = new THREE.GridHelper(140, 40, 0x00f0ff, 0x141a29);
+    gridHelper.position.y = -20.2;
+    gridHelper.material.transparent = true;
+    gridHelper.material.opacity = 0.35;
+    scene.add(gridHelper);
+
+    // خامات PBR
+    const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x181c24, metalness: 0.85, roughness: 0.35 });
+    const blackMat = new THREE.MeshStandardMaterial({ color: 0x121417, metalness: 0.1, roughness: 0.65 });
+    const copperMat = new THREE.MeshStandardMaterial({ color: 0xc87d55, metalness: 0.9, roughness: 0.25 });
+    const aluminumMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.92, roughness: 0.2 });
+    const neonCyanMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.8 });
+    const neonVioletMat = new THREE.MeshStandardMaterial({ color: 0x9d00ff, emissive: 0x9d00ff, emissiveIntensity: 1.8 });
+
+    const animatedFans = [];
+    const componentGroups = {};
+    const basePositions = new Map();
+    const componentProgress = new Map();
+
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    function tag(obj, id, castShadow = false) {
+      obj.userData = { componentId: id };
+      obj.traverse(c => {
+        c.userData = { componentId: id };
+        if (c.isMesh) {
+          c.receiveShadow = true;
+          c.castShadow = castShadow;
+        }
+      });
+    }
+
+    function createFanRotor(radius, bladeCount) {
+      const rotor = new THREE.Group();
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.35, radius * 0.35, radius * 0.25, 24), darkSteelMat);
+      hub.rotation.x = Math.PI / 2;
+      rotor.add(hub);
+
+      const bLen = radius * 0.6;
+      const bGeom = new THREE.BoxGeometry(bLen, radius * 0.03, radius * 0.28);
+      bGeom.translate(bLen / 2 + radius * 0.25, 0, 0);
+
+      for (let i = 0; i < bladeCount; i++) {
+        const blade = new THREE.Mesh(bGeom, darkSteelMat);
+        blade.rotation.z = (Math.PI * 2 * i) / bladeCount;
+        blade.rotation.x = 0.38;
+        rotor.add(blade);
+      }
+      animatedFans.push(rotor);
+      return rotor;
+    }
+
+    // بناء الأجزاء الثمانية الأساسية
+    // 1. Case
+    const caseGroup = new THREE.Group();
+    caseGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 38, 36), darkSteelMat));
+    const glassPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 37.2, 35.5),
+      new THREE.MeshPhysicalMaterial({ color: 0x99ccff, transparent: true, opacity: 0.45, transmission: 0.85, ior: 1.52, depthWrite: false })
+    );
+    glassPanel.position.set(8.2, 0, 0);
+    caseGroup.add(glassPanel);
+    tag(caseGroup, 'case');
+    rootGroup.add(caseGroup);
+    componentGroups.case = caseGroup;
+
+    // 2. PSU
+    const psuGroup = new THREE.Group();
+    psuGroup.position.set(-2.5, -12.5, -4.5);
+    psuGroup.add(new THREE.Mesh(new THREE.BoxGeometry(13.5, 7.5, 14.5), darkSteelMat));
+    const psuFan = createFanRotor(3.8, 7);
+    psuFan.position.set(0, -3.76, 0);
+    psuFan.rotation.x = -Math.PI / 2;
+    psuGroup.add(psuFan);
+    tag(psuGroup, 'psu');
+    rootGroup.add(psuGroup);
+    componentGroups.psu = psuGroup;
+
+    // 3. Motherboard
+    const mbGroup = new THREE.Group();
+    mbGroup.position.set(-6, 2, 0);
+    mbGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 29, 23.5), new THREE.MeshStandardMaterial({ color: 0x0d1520, metalness: 0.5, roughness: 0.4 })));
+    tag(mbGroup, 'motherboard');
+    rootGroup.add(mbGroup);
+    componentGroups.motherboard = mbGroup;
+
+    // 4. CPU
+    const cpuGroup = new THREE.Group();
+    cpuGroup.position.set(-5.6, 7.5, -1);
+    cpuGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.8, 3.8), aluminumMat));
+    tag(cpuGroup, 'cpu');
+    rootGroup.add(cpuGroup);
+    componentGroups.cpu = cpuGroup;
+
+    // 5. Cooler
+    const coolerGroup = new THREE.Group();
+    coolerGroup.position.set(-5, 7.5, -1);
+    coolerGroup.add(new THREE.Mesh(new THREE.BoxGeometry(4.2, 8, 9), aluminumMat));
+    const cpuFan = createFanRotor(4.2, 9);
+    cpuFan.position.set(5.7, 0, 0);
+    cpuFan.rotation.y = Math.PI / 2;
+    coolerGroup.add(cpuFan);
+    tag(coolerGroup, 'cooler');
+    rootGroup.add(coolerGroup);
+    componentGroups.cooler = coolerGroup;
+
+    // 6. RAM
+    const ramGroup = new THREE.Group();
+    ramGroup.position.set(-5.6, 7.5, 0);
+    const r1 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 9, 0.32), darkSteelMat);
+    r1.position.set(0.65, 0, 4.45);
+    ramGroup.add(r1);
+    const r2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 9, 0.32), darkSteelMat);
+    r2.position.set(0.65, 0, 6.95);
+    ramGroup.add(r2);
+    tag(ramGroup, 'ram');
+    rootGroup.add(ramGroup);
+    componentGroups.ram = ramGroup;
+
+    // 7. SSD
+    const ssdGroup = new THREE.Group();
+    ssdGroup.position.set(-5.3, 0.5, 4);
+    ssdGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.65, 2.2, 8), darkSteelMat));
+    tag(ssdGroup, 'ssd');
+    rootGroup.add(ssdGroup);
+    componentGroups.ssd = ssdGroup;
+
+    // 8. GPU
+    const gpuGroup = new THREE.Group();
+    gpuGroup.position.set(-1, -0.5, 3.5);
+    gpuGroup.add(new THREE.Mesh(new THREE.BoxGeometry(10.4, 3, 26), darkSteelMat));
+    const gFan1 = createFanRotor(3.6, 9);
+    gFan1.position.set(0, -3.3, -5.5);
+    gFan1.rotation.x = Math.PI / 2;
+    gpuGroup.add(gFan1);
+    const gFan2 = createFanRotor(3.6, 9);
+    gFan2.position.set(0, -3.3, 5.5);
+    gFan2.rotation.x = Math.PI / 2;
+    gpuGroup.add(gFan2);
+    tag(gpuGroup, 'gpu');
+    rootGroup.add(gpuGroup);
+    componentGroups.gpu = gpuGroup;
+
+    // حفظ المواضع
+    Object.entries(componentGroups).forEach(([id, grp]) => {
+      basePositions.set(grp, grp.position.clone());
+      componentProgress.set(id, 0.0);
+    });
+    basePositions.set(glassPanel, glassPanel.position.clone());
+
+    // -------------------------------------------------------------
+    // الكرة الأرضية الهولوغرافية ثلاثية الأبعاد الدوارة (The Internet)
+    // -------------------------------------------------------------
+    const globeGroup = new THREE.Group();
+    globeGroup.position.set(22, 14, -14);
+    globeGroup.userData = { componentId: 'internet' };
+    rootGroup.add(globeGroup);
+
+    // نسيج إجرائي للقارات
+    const gCvs = document.createElement('canvas');
+    gCvs.width = 1024; gCvs.height = 512;
+    const gCtx = gCvs.getContext('2d');
+    gCtx.fillStyle = '#060d1a'; gCtx.fillRect(0, 0, 1024, 512);
+    gCtx.fillStyle = '#00f0ff';
+    gCtx.fillRect(200, 150, 160, 200); // Americas
+    gCtx.fillRect(480, 120, 180, 240); // Eurasia & Africa
+    gCtx.fillRect(720, 160, 160, 180); // Asia
+    const gTex = new THREE.CanvasTexture(gCvs);
+
+    const globeMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(3.6, 32, 32),
+      new THREE.MeshStandardMaterial({ map: gTex, emissive: 0x004466, emissiveIntensity: 0.8, roughness: 0.3 })
+    );
+    globeMesh.userData = { componentId: 'internet' };
+    globeGroup.add(globeMesh);
+
+    const haloMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(3.9, 24, 24),
+      new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.5, transparent: true, opacity: 0.25, wireframe: true })
+    );
+    globeGroup.add(haloMesh);
+
+    const orbitRing = new THREE.Mesh(
+      new THREE.TorusGeometry(5.2, 0.06, 16, 64),
+      new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 2.0, transparent: true, opacity: 0.6 })
+    );
+    orbitRing.rotation.x = Math.PI / 3;
+    globeGroup.add(orbitRing);
+
+    // كابل الألياف الضوئية الممتد من اللوحة الأم نحو الكرة الأرضية
+    const internetCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-4.2, 8.5, -9.5),
+      new THREE.Vector3(2.0, 10.5, -12.0),
+      new THREE.Vector3(12.0, 12.0, -15.0),
+      new THREE.Vector3(22.0, 14.0, -14.0),
+    ]);
+    const cableMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(internetCurve, 32, 0.2, 8, false),
+      new THREE.MeshStandardMaterial({ color: 0x0d233a, emissive: 0x00f0ff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 })
+    );
+    rootGroup.add(cableMesh);
+
+    // -------------------------------------------------------------
+    // نظام جزيئات تدفق البيانات (Data Flow Particles)
+    // -------------------------------------------------------------
+    // مسارات تدفق البيانات
+    const pathCpuGpu = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-5.6, 7.5, -1), new THREE.Vector3(-2.5, 0, 2.5), new THREE.Vector3(-1, -0.5, 3.5)
+    ]);
+    const pathCpuRam = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-5.6, 7.5, -1), new THREE.Vector3(-5, 7.5, 5.5)
+    ]);
+    const pathPsuMb = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-2.5, -12.5, -4.5), new THREE.Vector3(-5.5, 7.5, 10.2)
+    ]);
+
+    const totalParticles = 96;
+    const particleGeo = new THREE.SphereGeometry(0.22, 8, 8);
+    const particleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 3.5 });
+    const instancedParticles = new THREE.InstancedMesh(particleGeo, particleMat, totalParticles);
+    rootGroup.add(instancedParticles);
+
+    const particles = [];
+    const dummyMat = new THREE.Matrix4();
+    const dummyPos = new THREE.Vector3();
+    const dummyQuat = new THREE.Quaternion();
+    const dummyScale = new THREE.Vector3(1, 1, 1);
+
+    const cCyan = new THREE.Color(0x00f0ff);
+    const cGreen = new THREE.Color(0x10b981);
+    const cOrange = new THREE.Color(0xff8800);
+    const cMagenta = new THREE.Color(0xd946ef);
+
+    for (let i = 0; i < totalParticles; i++) {
+      let crv = pathCpuGpu;
+      let col = cCyan;
+      let spd = 0.25 + Math.random() * 0.3;
+
+      if (i < 24) { crv = pathCpuGpu; col = cCyan; }
+      else if (i < 48) { crv = pathCpuRam; col = cGreen; }
+      else if (i < 72) { crv = pathPsuMb; col = cOrange; }
+      else { crv = internetCurve; col = (i % 2 === 0 ? cCyan : cMagenta); spd = 0.4; }
+
+      particles.push({ curve: crv, p: Math.random(), speed: spd });
+      instancedParticles.setColorAt(i, col);
+    }
+    if (instancedParticles.instanceColor) instancedParticles.instanceColor.needsUpdate = true;
+
+    // -------------------------------------------------------------
+    // الحالة والتفاعل البرمجي
+    // -------------------------------------------------------------
+    let explodeFactor = 0.0;
+    let targetExplode = 0.0;
+    let isAutoExplode = false;
+    let autoDir = 1;
+    let isDataFlow = true;
+    let isPowerOn = true;
+    let showNumbers = true;
+    let isXRay = false;
+    let isCinema = false;
+    let cinemaTimer = 0;
+    let cinemaIdx = 0;
+    const cinemaSequence = ['cpu', 'ram', 'gpu', 'ssd', 'motherboard', 'psu', 'case', 'internet'];
+    let currentStep = 1;
+    let installedParts = new Set(['case', 'psu', 'motherboard', 'cpu', 'cooler', 'ram', 'ssd', 'gpu']);
+
+    let targetCamPos = camera.position.clone();
+    let targetControlsTarget = controls.target.clone();
+    let isCamLerping = false;
+
+    // عناصر DOM
+    const markersContainer = document.getElementById('markers-container');
+    const cinemaOverlay = document.getElementById('cinema-overlay');
+    const cinemaToggleBtn = document.getElementById('cinema-toggle-btn');
+    const exitCinemaBtn = document.getElementById('exit-cinema-btn');
+    const cinemaTitle = document.getElementById('cinema-title');
+    const cinemaAnalogyBadge = document.getElementById('cinema-analogy-badge');
+    const cinemaQuote = document.getElementById('cinema-quote');
+    const dataflowToggleBtn = document.getElementById('dataflow-toggle-btn');
+    const guidePanel = document.getElementById('assembly-panel');
+    const guideToggleBtn = document.getElementById('guide-toggle-btn');
+    const closeGuideBtn = document.getElementById('close-guide-btn');
+    const numbersToggleBtn = document.getElementById('numbers-toggle-btn');
+    const powerToggleBtn = document.getElementById('power-toggle-btn');
+    const specCard = document.getElementById('spec-card');
+    const closeSpecBtn = document.getElementById('close-spec-btn');
+    const bottomDock = document.getElementById('bottom-dock');
+    const collapseToggleBtn = document.getElementById('collapse-toggle-btn');
+    const collapseIcon = document.getElementById('collapse-icon');
+    const collapseText = document.getElementById('collapse-text');
+    const explodeSlider = document.getElementById('explode-slider');
+    const explodeVal = document.getElementById('explode-val');
+    const autoExplodeBtn = document.getElementById('auto-explode-btn');
+    const xrayBtn = document.getElementById('xray-btn');
+    const globeFocusBtn = document.getElementById('globe-focus-btn');
+
+    let currentSelectedId = null;
+
+    // بطاقة مواصفات القطعة
+    function selectPart(id) {
+      currentSelectedId = id;
+      const st = HARDWARE_ITEMS.find(s => s.id === id);
+      if (!st) return;
+
+      document.getElementById('spec-title').textContent = st.nameAr;
+      document.getElementById('spec-human-title').textContent = st.humanTitle;
+      document.getElementById('spec-human-desc').textContent = st.humanDesc;
+
+      const tbl = document.getElementById('spec-table');
+      tbl.innerHTML = '';
+      st.specs.forEach(([k, v]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="color:#94a3b8">${k}</td><td style="text-align:left;color:#00f0ff">${v}</td>`;
+        tbl.appendChild(tr);
+      });
+
+      specCard.classList.add('visible');
+
+      if (id === 'internet') {
+        targetControlsTarget.set(22, 14, -14);
+        targetCamPos.set(28, 16, -10);
+        isCamLerping = true;
+        return;
+      }
+
+      const grp = componentGroups[id];
+      if (grp) {
+        const box = new THREE.Box3().setFromObject(grp);
+        const center = box.getCenter(new THREE.Vector3());
+        targetControlsTarget.copy(center);
+        targetCamPos.set(center.x + 16, center.y + 10, center.z + 16);
+        isCamLerping = true;
+      }
+    }
+
+    closeSpecBtn.onclick = () => {
+      specCard.classList.remove('visible');
+      currentSelectedId = null;
+    };
+
+    // الوضع السينمائي
+    function updateCinemaStep(id) {
+      const st = HARDWARE_ITEMS.find(s => s.id === id);
+      if (!st) return;
+      cinemaTitle.textContent = st.nameAr;
+      cinemaAnalogyBadge.textContent = st.humanTitle;
+      cinemaQuote.textContent = `« ${st.humanDesc} »`;
+      selectPart(id);
+    }
+
+    cinemaToggleBtn.onclick = () => {
+      isCinema = !isCinema;
+      cinemaOverlay.classList.toggle('visible', isCinema);
+      document.getElementById('main-header').style.display = isCinema ? 'none' : 'flex';
+      bottomDock.style.display = isCinema ? 'none' : 'block';
+      if (isCinema) {
+        cinemaIdx = 0;
+        cinemaTimer = 0;
+        targetExplode = 0.55;
+        updateCinemaStep(cinemaSequence[cinemaIdx]);
+      }
+    };
+
+    exitCinemaBtn.onclick = () => {
+      isCinema = false;
+      cinemaOverlay.classList.remove('visible');
+      document.getElementById('main-header').style.display = 'flex';
+      bottomDock.style.display = 'block';
+      targetCamPos.set(28, 22, 32);
+      targetControlsTarget.set(0, 0, 0);
+      isCamLerping = true;
+    };
+
+    document.getElementById('cinema-next-btn').onclick = () => {
+      cinemaIdx = (cinemaIdx + 1) % cinemaSequence.length;
+      updateCinemaStep(cinemaSequence[cinemaIdx]);
+    };
+    document.getElementById('cinema-prev-btn').onclick = () => {
+      cinemaIdx = (cinemaIdx - 1 + cinemaSequence.length) % cinemaSequence.length;
+      updateCinemaStep(cinemaSequence[cinemaIdx]);
+    };
+
+    // أزرار التحكم بالشريط
+    dataflowToggleBtn.onclick = () => {
+      isDataFlow = !isDataFlow;
+      dataflowToggleBtn.classList.toggle('active', isDataFlow);
+    };
+
+    powerToggleBtn.onclick = () => {
+      isPowerOn = !isPowerOn;
+      powerToggleBtn.classList.toggle('power-on', isPowerOn);
+      powerToggleBtn.textContent = isPowerOn ? '⚡ النظام يعمل' : '⭕ النظام مغلق';
+    };
+
+    numbersToggleBtn.onclick = () => {
+      showNumbers = !showNumbers;
+      numbersToggleBtn.classList.toggle('active', showNumbers);
+    };
+
+    guideToggleBtn.onclick = () => {
+      const isVis = guidePanel.classList.toggle('visible');
+      guideToggleBtn.classList.toggle('active', isVis);
+    };
+    closeGuideBtn.onclick = () => {
+      guidePanel.classList.remove('visible');
+      guideToggleBtn.classList.remove('active');
+    };
+
+    globeFocusBtn.onclick = () => selectPart('internet');
+
+    // إنشاء أرقام القطع التسلسلية (1-9)
+    function createMarkers() {
+      markersContainer.innerHTML = '';
+      HARDWARE_ITEMS.forEach((st, idx) => {
+        const el = document.createElement('div');
+        el.className = 'number-marker';
+        el.id = `marker-${st.id}`;
+        el.textContent = idx + 1;
+        el.onclick = () => selectPart(st.id);
+        markersContainer.appendChild(el);
+      });
+    }
+    createMarkers();
+
+    let lastCamPos = new THREE.Vector3();
+    let lastCamQuat = new THREE.Quaternion();
+    let lastMarkerExplode = -1;
+    let markersNeedRedraw = true;
+
+    const tempVec = new THREE.Vector3();
+    function updateMarkers() {
+      if (!showNumbers || isCinema) {
+        markersContainer.style.display = 'none';
+        return;
+      }
+      markersContainer.style.display = 'block';
+
+      // فحص التغيير (Dirty Check): يمنع أي عمليات DOM غير ضرورية إذا كانت الكاميرا ثابتة
+      const camPos = camera.position;
+      const camQuat = camera.quaternion;
+      const posMoved = camPos.distanceToSquared(lastCamPos) > 0.0001;
+      const rotMoved = Math.abs(camQuat.x - lastCamQuat.x) > 0.0001 ||
+                       Math.abs(camQuat.y - lastCamQuat.y) > 0.0001 ||
+                       Math.abs(camQuat.z - lastCamQuat.z) > 0.0001;
+      const explodeMoved = Math.abs(explodeFactor - lastMarkerExplode) > 0.0005;
+
+      if (!posMoved && !rotMoved && !explodeMoved && !markersNeedRedraw && !isCamLerping) {
+        return;
+      }
+      lastCamPos.copy(camPos);
+      lastCamQuat.copy(camQuat);
+      lastMarkerExplode = explodeFactor;
+      markersNeedRedraw = false;
+
+      HARDWARE_ITEMS.forEach((st) => {
+        const el = document.getElementById(`marker-${st.id}`);
+        if (el) {
+          if (st.id === 'internet') {
+            tempVec.set(22, 14, -14);
+          } else {
+            const grp = componentGroups[st.id];
+            if (grp) {
+              tempVec.copy(grp.position);
+              if (st.id === 'motherboard') tempVec.y += 2;
+              else if (st.id === 'cooler') tempVec.x += 2.5;
+              else if (st.id === 'ram') tempVec.z += 1.8;
+              else if (st.id === 'ssd') { tempVec.y -= 2.5; tempVec.z += 2.0; }
+              else if (st.id === 'gpu') { tempVec.y -= 4.5; tempVec.z += 4.0; }
+              else if (st.id === 'psu') { tempVec.y -= 14; tempVec.z -= 6; }
+            }
+          }
+          tempVec.project(camera);
+
+          if (tempVec.z > 1.0) {
+            el.style.display = 'none';
+          } else {
+            el.style.display = 'flex';
+            const sx = ((tempVec.x + 1) * window.innerWidth) / 2;
+            const sy = ((-tempVec.y + 1) * window.innerHeight) / 2;
+            el.style.transform = `translate3d(${sx}px, ${sy}px, 0) translate(-50%, -50%)`;
+          }
+        }
+      });
+    }
+
+    // زر وضع الأداء الفائق 60 FPS
+    let isTurbo = false;
+    const turboBtn = document.getElementById('turbo-toggle-btn');
+    if (turboBtn) {
+      turboBtn.onclick = () => {
+        isTurbo = !isTurbo;
+        if (isTurbo) {
+          renderer.setPixelRatio(1.0);
+          renderer.shadowMap.enabled = false;
+          turboBtn.textContent = '⚡ وضع 60 FPS (نشط)';
+          turboBtn.style.background = 'rgba(16, 185, 129, 0.25)';
+          turboBtn.style.borderColor = '#34d399';
+        } else {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+          renderer.shadowMap.enabled = true;
+          turboBtn.textContent = '⚡ وضع 60 FPS';
+          turboBtn.style.background = '#111622';
+          turboBtn.style.borderColor = '#10b981';
+        }
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      };
+    }
+
+    // شريط التفكيك
+    explodeSlider.oninput = (e) => {
+      targetExplode = parseFloat(e.target.value);
+      isAutoExplode = false;
+      HARDWARE_ITEMS.forEach(s => {
+        if (s.id !== 'internet') componentProgress.set(s.id, targetExplode);
+      });
+    };
+
+    autoExplodeBtn.onclick = () => {
+      isAutoExplode = !isAutoExplode;
+      autoExplodeBtn.classList.toggle('active', isAutoExplode);
+    };
+
+    xrayBtn.onclick = () => {
+      isXRay = !isXRay;
+      xrayBtn.classList.toggle('active', isXRay);
+      [darkSteelMat, blackMat, aluminumMat, copperMat].forEach(m => m.wireframe = isXRay);
+    };
+
+    collapseToggleBtn.onclick = () => {
+      const isCol = bottomDock.classList.toggle('collapsed');
+      collapseIcon.textContent = isCol ? '▴' : '▾';
+      collapseText.textContent = isCol ? 'إظهار لوحة التحكم' : 'إخفاء لوحة التحكم';
+    };
+
+    const CAM_PRESETS = {
+      iso: { pos: [28, 22, 32], tar: [0, 0, 0] },
+      front: { pos: [0, 2, 42], tar: [0, 0, 0] },
+      side: { pos: [40, 2, 0], tar: [0, 0, 0] },
+      cpu: { pos: [12, 6, 8], tar: [0, 4, 0] },
+      gpu: { pos: [14, -6, 16], tar: [0, -5, 6] },
+      globe: { pos: [28, 16, -10], tar: [22, 14, -14] }
+    };
+
+    document.querySelectorAll('[data-cam]').forEach(b => {
+      b.onclick = () => {
+        const c = CAM_PRESETS[b.getAttribute('data-cam')];
+        if (c) {
+          targetCamPos.set(...c.pos);
+          targetControlsTarget.set(...c.tar);
+          isCamLerping = true;
+        }
+      };
+    });
+
+    controls.addEventListener('start', () => { isCamLerping = false; });
+    window.onresize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+
+    // -------------------------------------------------------------
+    // حلقة التحريك والتصيير (Animation Loop)
+    // -------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.getElapsedTime();
+
+      // حركة التفكيك التلقائي
+      if (isAutoExplode) {
+        targetExplode += autoDir * delta * 0.35;
+        if (targetExplode >= 1.0) { targetExplode = 1.0; autoDir = -1; }
+        else if (targetExplode <= 0.0) { targetExplode = 0.0; autoDir = 1; }
+        explodeSlider.value = targetExplode;
+        HARDWARE_ITEMS.forEach(s => {
+          if (s.id !== 'internet') componentProgress.set(s.id, targetExplode);
+        });
+      }
+
+      explodeFactor = THREE.MathUtils.damp(explodeFactor, targetExplode, 6.0, delta);
+      explodeVal.textContent = Math.round(explodeFactor * 100) + '%';
+
+      // تطبيق إزاحات التفكيك
+      HARDWARE_ITEMS.forEach(st => {
+        if (st.id === 'internet') return;
+        const grp = componentGroups[st.id];
+        const base = basePositions.get(grp);
+        const p = componentProgress.get(st.id) ?? explodeFactor;
+        if (grp && base) {
+          grp.position.x = base.x + st.offset[0] * p;
+          grp.position.y = base.y + st.offset[1] * p;
+          grp.position.z = base.z + st.offset[2] * p;
+        }
+      });
+
+      const glassBase = basePositions.get(glassPanel);
+      const caseP = componentProgress.get('case') ?? explodeFactor;
+      if (glassBase) {
+        glassPanel.position.x = glassBase.x + 18.0 * caseP;
+      }
+
+      // دوران شفرات المراوح
+      if (isPowerOn) {
+        animatedFans.forEach(r => r.rotation.z += 0.14);
+      }
+
+      // دوران الكرة الأرضية
+      globeMesh.rotation.y += delta * 0.35;
+      orbitRing.rotation.z += delta * 0.4;
+
+      // تحديث جزيئات تدفق البيانات
+      if (isPowerOn && isDataFlow) {
+        instancedParticles.visible = true;
+        for (let i = 0; i < totalParticles; i++) {
+          const pt = particles[i];
+          pt.p += pt.speed * delta;
+          if (pt.p >= 1.0) pt.p = 0.0;
+          pt.curve.getPointAt(pt.p, dummyPos);
+          dummyMat.compose(dummyPos, dummyQuat, dummyScale);
+          instancedParticles.setMatrixAt(i, dummyMat);
+        }
+        instancedParticles.instanceMatrix.needsUpdate = true;
+      } else {
+        instancedParticles.visible = false;
+      }
+
+      // الوضع السينمائي
+      if (isCinema) {
+        cinemaTimer += delta;
+        if (cinemaTimer >= 6.0) {
+          cinemaTimer = 0;
+          cinemaIdx = (cinemaIdx + 1) % cinemaSequence.length;
+          updateCinemaStep(cinemaSequence[cinemaIdx]);
+        }
+        camera.position.x += Math.sin(elapsed * 0.4) * 0.05;
+        camera.position.z += Math.cos(elapsed * 0.4) * 0.05;
+      }
+
+      if (isCamLerping) {
+        camera.position.lerp(targetCamPos, 0.06);
+        controls.target.lerp(targetControlsTarget, 0.06);
+        if (camera.position.distanceTo(targetCamPos) < 0.1) isCamLerping = false;
+      }
+
+      updateMarkers();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

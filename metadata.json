@@ -1,0 +1,6 @@
+{
+  "name": "CyberPC 3D Exploded View",
+  "description": "Interactive 3D anatomical visualization and exploded view of a high-performance PC with Three.js, procedural PBR materials, glowing circuit traces, fan speed control, and component inspection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
